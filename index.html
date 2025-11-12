@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Illumisense</title>
     
-    <!-- APP ICONS (Points to your uploaded file) -->
+    <!-- APP ICONS -->
     <link rel="icon" type="image/jpeg" href="icon.jpg">
     <link rel="apple-touch-icon" href="icon.jpg">
     <meta name="theme-color" content="#050505">
@@ -30,7 +30,7 @@
             -webkit-tap-highlight-color: transparent;
             overflow: hidden;
             user-select: none;
-            height: 100dvh; /* Fixes Google Bar issue */
+            height: 100dvh; 
         }
 
         /* --- Ambient Background --- */
@@ -813,24 +813,30 @@
                     return;
                 }
 
-                // 2. GLOBAL: All Off
-                // Using Regex to match whole words so "turn on office" doesn't trigger "off"
-                if (/\b(all off|everything off|lights off|shut down)\b/.test(cmd)) {
+                // 2. GLOBAL: SMART "ALL OFF" (KEYWORD COMBINATIONS)
+                // Checks for "All/Everything/House" AND "Off/Stop/Leave/Kill"
+                const isGlobalOff = (cmd.includes('all') || cmd.includes('everything') || cmd.includes('house') || cmd.includes('leaving') || cmd.includes('everyone')) && 
+                                    (cmd.includes('off') || cmd.includes('stop') || cmd.includes('kill') || cmd.includes('out') || cmd.includes('shutdown') || cmd.includes('bye'));
+                
+                if (isGlobalOff || cmd.includes('lights off') || cmd.includes('dark mode')) {
                     window.applyGlobalScene('off');
                     return;
                 }
 
-                // 3. GLOBAL: All On
-                if (cmd.includes('all on') || cmd.includes('turn on all') || cmd.includes('everything on')) {
+                // 3. GLOBAL: SMART "ALL ON"
+                const isGlobalOn = (cmd.includes('all') || cmd.includes('everything') || cmd.includes('house') || cmd.includes('home')) && 
+                                   (cmd.includes('on') || cmd.includes('start') || cmd.includes('bright') || cmd.includes('up'));
+                                   
+                if (isGlobalOn || cmd.includes('lights on')) {
                     window.applyGlobalScene('focus');
                     return;
                 }
 
                 // 4. SCENES & MOODS (Global)
                 const sceneKeywords = {
-                    'night': ['night', 'sleep', 'bedtime', 'dark'],
+                    'night': ['night', 'sleep', 'bedtime', 'dark', 'goodnight'],
                     'relax': ['relax', 'chill', 'rest', 'cozy'],
-                    'focus': ['focus', 'study', 'work', 'bright'],
+                    'focus': ['focus', 'study', 'work', 'bright', 'reading'],
                     'movie': ['movie', 'cinema', 'film', 'theatre'],
                     'ocean': ['ocean', 'sea', 'water', 'blue mood'],
                     'forest': ['forest', 'jungle', 'nature', 'green mood'],
