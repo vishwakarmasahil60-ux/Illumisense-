@@ -6,8 +6,11 @@
     <title>Illumisense Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Drag and Drop -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
@@ -52,6 +55,7 @@
         }
         .room-card:active { transform: scale(0.96); }
 
+        /* Milky White Faded Halo */
         @keyframes milky-halo {
             0% { box-shadow: 0 0 15px rgba(255, 255, 255, 0.3), 0 0 30px var(--glow-color-dim); border-color: rgba(255, 255, 255, 0.3); }
             50% { box-shadow: 0 0 25px rgba(255, 255, 255, 0.6), 0 0 50px var(--glow-color); border-color: rgba(255, 255, 255, 0.5); }
@@ -214,7 +218,7 @@
                     <span class="text-[10px] text-gray-600 bg-gray-900 px-2 py-1 rounded border border-gray-800">Long press to reorder</span>
                 </div>
                 <div id="rooms-container" class="grid grid-cols-2 gap-4 pb-4 relative px-1">
-                    <!-- Cards will be injected here -->
+                    <!-- Cards will be injected here by JS -->
                 </div>
             </div>
         </main>
@@ -427,21 +431,33 @@
         let brightnessTimeout; 
         let colorWheelActive = false;
 
+        // --- DATA VERSIONING (For Reset) ---
+        const DATA_VERSION = 3; // Increment to force reset for new users/updates
+
         // --- DEFAULT LOCAL DATA (For standalone use) ---
         const DEFAULT_ROOMS = {
             'living': { id: 'living', name: 'Living Room', icon: 'ph-armchair', isOn: true, brightness: 80, color: '#FF9500', order: 0 },
             'kitchen': { id: 'kitchen', name: 'Kitchen', icon: 'ph-cooking-pot', isOn: true, brightness: 100, color: '#FFFFFF', order: 1 },
             'bedroom': { id: 'bedroom', name: 'Bedroom', icon: 'ph-bed', isOn: false, brightness: 40, color: '#8B5CF6', order: 2 },
-            'office': { id: 'office', name: 'Home Office', icon: 'ph-desktop', isOn: false, brightness: 60, color: '#3B82F6', order: 3 },
+            'office': { id: 'office', name: 'Office', icon: 'ph-desktop', isOn: false, brightness: 60, color: '#3B82F6', order: 3 },
             'hallway': { id: 'hallway', name: 'Hallway', icon: 'ph-door', isOn: false, brightness: 30, color: '#FCD34D', order: 4 },
             'garden': { id: 'garden', name: 'Garden', icon: 'ph-potted-plant', isOn: false, brightness: 100, color: '#10B981', order: 5 }
         };
 
         // Try to load from localStorage or use defaults
         try {
-            const saved = localStorage.getItem('illumisense_rooms');
-            if (saved) roomsData = JSON.parse(saved);
-            else roomsData = JSON.parse(JSON.stringify(DEFAULT_ROOMS));
+            const currentVersion = parseInt(localStorage.getItem('illumisense_version') || '0');
+            if (currentVersion < DATA_VERSION) {
+                // FORCE RESET for update
+                roomsData = JSON.parse(JSON.stringify(DEFAULT_ROOMS));
+                localStorage.setItem('illumisense_version', DATA_VERSION);
+                saveLocalData();
+                console.log("App updated: Data reset to defaults.");
+            } else {
+                const saved = localStorage.getItem('illumisense_rooms');
+                if (saved) roomsData = JSON.parse(saved);
+                else roomsData = JSON.parse(JSON.stringify(DEFAULT_ROOMS));
+            }
         } catch(e) {
             roomsData = JSON.parse(JSON.stringify(DEFAULT_ROOMS));
         }
@@ -776,22 +792,103 @@
             const recognition = new webkitSpeechRecognition();
             recognition.lang = 'en-US';
             recognition.onstart = () => { ring.classList.remove('hidden'); btn.classList.add('bg-blue-600'); };
+            
             recognition.onresult = (e) => { 
                 const cmd = e.results[0][0].transcript.toLowerCase();
-                // Voice Logic
-                if (cmd.includes('off')) window.applyGlobalScene('off');
-                else if (cmd.includes('party')) window.togglePartyMode();
-                else {
-                    Object.values(roomsData).forEach(r => {
-                         if(cmd.includes(r.name.toLowerCase())) {
-                             if(cmd.includes('on')) { r.isOn = true; }
-                             if(cmd.includes('red')) { r.color = '#EF4444'; r.isOn = true; }
-                             if(cmd.includes('blue')) { r.color = '#3B82F6'; r.isOn = true; }
-                         }
-                    });
-                    saveLocalData();
+                console.log("Voice:", cmd);
+
+                // 1. GLOBAL: Party Mode
+                if (cmd.includes('party') || cmd.includes('disco') || cmd.includes('dance')) {
+                    window.togglePartyMode();
+                    return;
                 }
+
+                // 2. GLOBAL: All Off
+                // Using Regex to match whole words so "turn on office" doesn't trigger "off"
+                if (/\b(all off|everything off|lights off|shut down)\b/.test(cmd)) {
+                    window.applyGlobalScene('off');
+                    return;
+                }
+
+                // 3. GLOBAL: All On
+                if (cmd.includes('all on') || cmd.includes('turn on all') || cmd.includes('everything on')) {
+                    window.applyGlobalScene('focus');
+                    return;
+                }
+
+                // 4. SCENES & MOODS (Global)
+                const sceneKeywords = {
+                    'night': ['night', 'sleep', 'bedtime', 'dark'],
+                    'relax': ['relax', 'chill', 'rest', 'cozy'],
+                    'focus': ['focus', 'study', 'work', 'bright'],
+                    'movie': ['movie', 'cinema', 'film', 'theatre'],
+                    'ocean': ['ocean', 'sea', 'water', 'blue mood'],
+                    'forest': ['forest', 'jungle', 'nature', 'green mood'],
+                    'sunset': ['sunset', 'evening', 'dusk', 'orange mood'],
+                    'romance': ['romance', 'love', 'date', 'pink mood']
+                };
+
+                for (const [id, words] of Object.entries(sceneKeywords)) {
+                    if (words.some(w => cmd.includes(w))) {
+                        if (['ocean', 'forest', 'sunset', 'romance'].includes(id)) window.triggerEffect(id);
+                        else window.applyGlobalScene(id);
+                        return;
+                    }
+                }
+
+                // 5. SPECIFIC ROOM CONTROL - SYNONYM DICTIONARY
+                const roomSynonyms = {
+                    'living': ['living', 'lounge', 'family', 'main room'],
+                    'kitchen': ['kitchen', 'cooking', 'dining', 'food'],
+                    'bedroom': ['bed', 'bedroom', 'sleep room', 'master'],
+                    'office': ['office', 'work', 'desk', 'study', 'computer', 'home office'],
+                    'hallway': ['hall', 'corridor', 'entry', 'stairs'],
+                    'garden': ['garden', 'yard', 'patio', 'outside', 'balcony']
+                };
+
+                let changeMade = false;
+                Object.values(roomsData).forEach(room => {
+                    const roomId = room.id;
+                    const synonyms = roomSynonyms[roomId] || [roomId];
+                    
+                    // Check if command contains any synonym for this room
+                    if (synonyms.some(s => cmd.includes(s))) {
+                        
+                        // SMART "ON" LOGIC
+                        // Matches "on", "start", "enable" as whole words
+                        if (/\b(on|start|enable|activate)\b/.test(cmd) || cmd.includes('light up')) { 
+                            room.isOn = true; changeMade = true; 
+                        }
+                        
+                        // SMART "OFF" LOGIC
+                        // Matches "off", "stop", "kill" as whole words
+                        // This prevents "Office" (which contains "off") from triggering this!
+                        if (/\b(off|stop|kill|disable)\b/.test(cmd)) { 
+                            room.isOn = false; changeMade = true; 
+                        }
+
+                        // Colors Logic
+                        const colorMap = {
+                            'red': '#EF4444', 'blue': '#3B82F6', 'green': '#10B981', 'yellow': '#F59E0B', 
+                            'purple': '#A855F7', 'orange': '#F97316', 'pink': '#EC4899', 'cyan': '#06B6D4', 
+                            'white': '#FFFFFF', 'warm': '#FFD6AA', 'gold': '#F59E0B', 'magenta': '#DB2777',
+                            'warm white': '#FFD6AA', 'milky white': '#FDF4DC', 'cool white': '#F3F4F6', 'soft white': '#FEF3C7',
+                            'light yellow': '#FEF08A', 'warm yellow': '#F59E0B', 'lavender': '#E9D5FF', 'violet': '#8B5CF6',
+                            'coral': '#FB7185', 'teal': '#14B8A6', 'sky blue': '#7DD3FC', 'lime': '#84CC16'
+                        };
+                        for (const [cName, hex] of Object.entries(colorMap)) {
+                            if (cmd.includes(cName)) { room.color = hex; room.isOn = true; changeMade = true; }
+                        }
+                        
+                        // Brightness Logic
+                        if (cmd.includes('dim') || cmd.includes('low')) { room.brightness = 30; room.isOn = true; changeMade = true; }
+                        if (cmd.includes('bright') || cmd.includes('max') || cmd.includes('full')) { room.brightness = 100; room.isOn = true; changeMade = true; }
+                    }
+                });
+
+                if (changeMade) saveLocalData();
             };
+
             recognition.onend = () => { ring.classList.add('hidden'); btn.classList.remove('bg-blue-600'); };
             recognition.start();
         };
