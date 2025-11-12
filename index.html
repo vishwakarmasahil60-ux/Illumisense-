@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Illumisense</title>
     
-    <!-- APP ICONS -->
-    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/5606/5606453.png">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5606/5606453.png">
+    <!-- APP ICONS (Points to your uploaded file) -->
+    <link rel="icon" type="image/jpeg" href="icon.jpg">
+    <link rel="apple-touch-icon" href="icon.jpg">
     <meta name="theme-color" content="#050505">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -30,8 +30,7 @@
             -webkit-tap-highlight-color: transparent;
             overflow: hidden;
             user-select: none;
-            /* KEY FIX: Use dynamic viewport height to avoid Google Bar overlap */
-            height: 100dvh; 
+            height: 100dvh; /* Fixes Google Bar issue */
         }
 
         /* --- Ambient Background --- */
