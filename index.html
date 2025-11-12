@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Illumisense</title>
     
-    <!-- APP ICONS (This fixes the home screen icon!) -->
+    <!-- APP ICONS -->
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/5606/5606453.png">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/5606/5606453.png">
     <meta name="theme-color" content="#050505">
@@ -30,6 +30,8 @@
             -webkit-tap-highlight-color: transparent;
             overflow: hidden;
             user-select: none;
+            /* KEY FIX: Use dynamic viewport height to avoid Google Bar overlap */
+            height: 100dvh; 
         }
 
         /* --- Ambient Background --- */
@@ -139,7 +141,7 @@
         .tip-card { animation: slideUpFade 0.6s ease-out forwards; }
     </style>
 </head>
-<body class="h-screen flex flex-col items-center justify-center bg-black selection:bg-blue-500 selection:text-white">
+<body class="flex flex-col items-center justify-center bg-black selection:bg-blue-500 selection:text-white">
 
     <div id="ambient-bg"></div>
 
@@ -165,8 +167,8 @@
             </div>
         </header>
 
-        <!-- VIEW: HOME -->
-        <main id="view-home" class="flex-1 overflow-y-auto no-scrollbar px-4 pb-28 transition-opacity duration-300">
+        <!-- VIEW: HOME (Increased padding-bottom to clear nav bar) -->
+        <main id="view-home" class="flex-1 overflow-y-auto no-scrollbar px-4 pb-32 transition-opacity duration-300">
             <!-- Scenes -->
             <div class="mb-6">
                 <div class="flex justify-between items-end px-2 mb-3">
@@ -233,7 +235,7 @@
         </main>
 
         <!-- VIEW: ENERGY -->
-        <main id="view-energy" class="flex-1 overflow-y-auto no-scrollbar px-6 pb-28 hidden transition-opacity duration-300">
+        <main id="view-energy" class="flex-1 overflow-y-auto no-scrollbar px-6 pb-32 hidden transition-opacity duration-300">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-xl font-bold">Energy Insights</h2>
                 <div class="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full">
@@ -316,8 +318,8 @@
             </div>
         </main>
 
-        <!-- Navigation -->
-        <nav class="absolute bottom-0 w-full glass-panel h-[88px] flex justify-around items-start pt-4 z-30 rounded-t-[2rem] border-t border-white/5">
+        <!-- Navigation (KEY FIX: Fixed position + Padding for bottom bar) -->
+        <nav class="fixed bottom-0 w-full glass-panel h-[100px] flex justify-around items-start pt-4 z-30 rounded-t-[2rem] border-t border-white/5 pb-6">
             <button onclick="switchView('home')" id="nav-home" class="flex flex-col items-center gap-1 p-2 w-16 text-blue-400 transition-colors"><i class="ph-fill ph-house text-2xl"></i><span class="text-[10px] font-medium">Home</span></button>
             <button onclick="switchView('energy')" id="nav-energy" class="flex flex-col items-center gap-1 p-2 w-16 text-gray-500 hover:text-white transition-colors"><i class="ph-bold ph-lightning text-2xl"></i><span class="text-[10px] font-medium">Energy</span></button>
             <button class="flex flex-col items-center gap-1 p-2 w-16 text-gray-500 hover:text-white transition-colors opacity-50 cursor-not-allowed"><i class="ph-bold ph-gear text-2xl"></i><span class="text-[10px] font-medium">Settings</span></button>
