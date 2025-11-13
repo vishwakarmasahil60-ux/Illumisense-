@@ -807,23 +807,34 @@
                 const cmd = e.results[0][0].transcript.toLowerCase();
                 console.log("Voice:", cmd);
 
-                // 1. GLOBAL: Party Mode
+                // --- 1. SPECIFIC PHRASE TRIGGERS ---
+                // "I'm leaving", "I am leaving" -> All Off
+                if (cmd.includes("leaving") || cmd.includes("going out")) {
+                    window.applyGlobalScene('off');
+                    return;
+                }
+                // "I'm home", "I am home", "honey I'm home" -> All On
+                if (cmd.includes("i'm home") || cmd.includes("i am home")) {
+                    window.applyGlobalScene('focus');
+                    return;
+                }
+
+                // --- 2. GLOBAL COMMANDS ---
                 if (cmd.includes('party') || cmd.includes('disco') || cmd.includes('dance')) {
                     window.togglePartyMode();
                     return;
                 }
-
-                // 2. GLOBAL: SMART "ALL OFF" (KEYWORD COMBINATIONS)
-                // Checks for "All/Everything/House" AND "Off/Stop/Leave/Kill"
-                const isGlobalOff = (cmd.includes('all') || cmd.includes('everything') || cmd.includes('house') || cmd.includes('leaving') || cmd.includes('everyone')) && 
+                
+                // Global Off (Fallbacks)
+                const isGlobalOff = (cmd.includes('all') || cmd.includes('everything') || cmd.includes('house') || cmd.includes('everyone')) && 
                                     (cmd.includes('off') || cmd.includes('stop') || cmd.includes('kill') || cmd.includes('out') || cmd.includes('shutdown') || cmd.includes('bye'));
                 
-                if (isGlobalOff || cmd.includes('lights off') || cmd.includes('dark mode')) {
+                if (isGlobalOff || cmd.includes('lights off') || cmd.includes('dark mode') || cmd.includes('shut down')) {
                     window.applyGlobalScene('off');
                     return;
                 }
 
-                // 3. GLOBAL: SMART "ALL ON"
+                // Global On (Fallbacks)
                 const isGlobalOn = (cmd.includes('all') || cmd.includes('everything') || cmd.includes('house') || cmd.includes('home')) && 
                                    (cmd.includes('on') || cmd.includes('start') || cmd.includes('bright') || cmd.includes('up'));
                                    
@@ -832,7 +843,7 @@
                     return;
                 }
 
-                // 4. SCENES & MOODS (Global)
+                // --- 3. SCENES & MOODS ---
                 const sceneKeywords = {
                     'night': ['night', 'sleep', 'bedtime', 'dark', 'goodnight'],
                     'relax': ['relax', 'chill', 'rest', 'cozy'],
@@ -852,7 +863,7 @@
                     }
                 }
 
-                // 5. SPECIFIC ROOM CONTROL - SYNONYM DICTIONARY
+                // --- 4. ROOM CONTROL (Including Brightness) ---
                 const roomSynonyms = {
                     'living': ['living', 'lounge', 'family', 'main room'],
                     'kitchen': ['kitchen', 'cooking', 'dining', 'food'],
@@ -863,22 +874,22 @@
                 };
 
                 let changeMade = false;
+                let mentionedRoom = false;
+
                 Object.values(roomsData).forEach(room => {
                     const roomId = room.id;
                     const synonyms = roomSynonyms[roomId] || [roomId];
                     
                     // Check if command contains any synonym for this room
                     if (synonyms.some(s => cmd.includes(s))) {
+                        mentionedRoom = true;
                         
-                        // SMART "ON" LOGIC
-                        // Matches "on", "start", "enable" as whole words
+                        // ON Logic
                         if (/\b(on|start|enable|activate)\b/.test(cmd) || cmd.includes('light up')) { 
                             room.isOn = true; changeMade = true; 
                         }
                         
-                        // SMART "OFF" LOGIC
-                        // Matches "off", "stop", "kill" as whole words
-                        // This prevents "Office" (which contains "off") from triggering this!
+                        // OFF Logic
                         if (/\b(off|stop|kill|disable)\b/.test(cmd)) { 
                             room.isOn = false; changeMade = true; 
                         }
@@ -896,11 +907,30 @@
                             if (cmd.includes(cName)) { room.color = hex; room.isOn = true; changeMade = true; }
                         }
                         
-                        // Brightness Logic
-                        if (cmd.includes('dim') || cmd.includes('low')) { room.brightness = 30; room.isOn = true; changeMade = true; }
-                        if (cmd.includes('bright') || cmd.includes('max') || cmd.includes('full')) { room.brightness = 100; room.isOn = true; changeMade = true; }
+                        // BRIGHTNESS LOGIC
+                        // 1. Exact Number (e.g. "50%")
+                        const percentMatch = cmd.match(/(\d{1,3})%/);
+                        if (percentMatch) {
+                             let val = parseInt(percentMatch[1]);
+                             if (val > 100) val = 100; if (val < 0) val = 0;
+                             room.brightness = val; room.isOn = true; changeMade = true;
+                        }
+                        // 2. Keywords
+                        else if (cmd.includes('dim') || cmd.includes('low')) { room.brightness = 30; room.isOn = true; changeMade = true; }
+                        else if (cmd.includes('bright') || cmd.includes('max') || cmd.includes('full')) { room.brightness = 100; room.isOn = true; changeMade = true; }
                     }
                 });
+
+                // Global Dimming (if no specific room mentioned but command implies brightness)
+                if (!mentionedRoom && (cmd.includes('dim') || cmd.includes('brightness') || cmd.includes('low light'))) {
+                     const percentMatch = cmd.match(/(\d{1,3})%/);
+                     let targetBri = 30; // Default dim
+                     if (percentMatch) targetBri = parseInt(percentMatch[1]);
+                     
+                     Object.values(roomsData).forEach(room => {
+                         if (room.isOn) { room.brightness = targetBri; changeMade = true; }
+                     });
+                }
 
                 if (changeMade) saveLocalData();
             };
