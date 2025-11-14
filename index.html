@@ -795,8 +795,13 @@
             }
         };
 
+        // --- (SMARTER VOICE CONTROL) ---
         window.toggleVoiceControl = () => {
-            if (!('webkitSpeechRecognition' in window)) { alert("Voice control requires a modern browser (Chrome/Edge)."); return; }
+            if (!('webkitSpeechRecognition' in window)) { 
+                // A soft alert for non-compatible browsers
+                alert("Voice control requires a modern browser (Chrome/Edge)."); 
+                return; 
+            }
             const btn = document.getElementById('voice-btn'), ring = document.getElementById('voice-ring');
             triggerHaptic();
             const recognition = new webkitSpeechRecognition();
@@ -807,63 +812,24 @@
                 const cmd = e.results[0][0].transcript.toLowerCase();
                 console.log("Voice:", cmd);
 
-                // --- 1. SPECIFIC PHRASE TRIGGERS ---
-                // "I'm leaving", "I am leaving" -> All Off
-                if (cmd.includes("leaving") || cmd.includes("going out")) {
+                // --- 1. SPECIFIC PHRASE TRIGGERS (Highest Priority) ---
+                if (cmd.includes("leaving") || cmd.includes("going out") || cmd.includes("goodbye")) {
+                    console.log("Trigger: Leaving");
                     window.applyGlobalScene('off');
                     return;
                 }
-                // "I'm home", "I am home", "honey I'm home" -> All On
                 if (cmd.includes("i'm home") || cmd.includes("i am home")) {
+                    console.log("Trigger: I'm Home");
                     window.applyGlobalScene('focus');
                     return;
                 }
-
-                // --- 2. GLOBAL COMMANDS ---
                 if (cmd.includes('party') || cmd.includes('disco') || cmd.includes('dance')) {
+                    console.log("Trigger: Party");
                     window.togglePartyMode();
                     return;
                 }
-                
-                // Global Off (Fallbacks)
-                const isGlobalOff = (cmd.includes('all') || cmd.includes('everything') || cmd.includes('house') || cmd.includes('everyone')) && 
-                                    (cmd.includes('off') || cmd.includes('stop') || cmd.includes('kill') || cmd.includes('out') || cmd.includes('shutdown') || cmd.includes('bye'));
-                
-                if (isGlobalOff || cmd.includes('lights off') || cmd.includes('dark mode') || cmd.includes('shut down')) {
-                    window.applyGlobalScene('off');
-                    return;
-                }
 
-                // Global On (Fallbacks)
-                const isGlobalOn = (cmd.includes('all') || cmd.includes('everything') || cmd.includes('house') || cmd.includes('home')) && 
-                                   (cmd.includes('on') || cmd.includes('start') || cmd.includes('bright') || cmd.includes('up'));
-                                   
-                if (isGlobalOn || cmd.includes('lights on')) {
-                    window.applyGlobalScene('focus');
-                    return;
-                }
-
-                // --- 3. SCENES & MOODS ---
-                const sceneKeywords = {
-                    'night': ['night', 'sleep', 'bedtime', 'dark', 'goodnight'],
-                    'relax': ['relax', 'chill', 'rest', 'cozy'],
-                    'focus': ['focus', 'study', 'work', 'bright', 'reading'],
-                    'movie': ['movie', 'cinema', 'film', 'theatre'],
-                    'ocean': ['ocean', 'sea', 'water', 'blue mood'],
-                    'forest': ['forest', 'jungle', 'nature', 'green mood'],
-                    'sunset': ['sunset', 'evening', 'dusk', 'orange mood'],
-                    'romance': ['romance', 'love', 'date', 'pink mood']
-                };
-
-                for (const [id, words] of Object.entries(sceneKeywords)) {
-                    if (words.some(w => cmd.includes(w))) {
-                        if (['ocean', 'forest', 'sunset', 'romance'].includes(id)) window.triggerEffect(id);
-                        else window.applyGlobalScene(id);
-                        return;
-                    }
-                }
-
-                // --- 4. ROOM CONTROL (Including Brightness) ---
+                // --- 2. ROOM CONTROL (Check for specific rooms FIRST) ---
                 const roomSynonyms = {
                     'living': ['living', 'lounge', 'family', 'main room'],
                     'kitchen': ['kitchen', 'cooking', 'dining', 'food'],
@@ -874,7 +840,7 @@
                 };
 
                 let changeMade = false;
-                let mentionedRoom = false;
+                let mentionedRoom = false; 
 
                 Object.values(roomsData).forEach(room => {
                     const roomId = room.id;
@@ -882,15 +848,20 @@
                     
                     // Check if command contains any synonym for this room
                     if (synonyms.some(s => cmd.includes(s))) {
+                        console.log(`Match: Room ${roomId}`);
                         mentionedRoom = true;
                         
-                        // ON Logic
-                        if (/\b(on|start|enable|activate)\b/.test(cmd) || cmd.includes('light up')) { 
+                        const onKeywords = /\b(on|onn|start|enable|activate|light up|brighten|power on)\b/i;
+                        const offKeywords = /\b(off|stop|kill|disable|shut down|darken|power off|turn off)\b/i;
+
+                        // Prioritize ON command
+                        if (onKeywords.test(cmd)) { 
+                            console.log(`Action: ${roomId} ON`);
                             room.isOn = true; changeMade = true; 
-                        }
-                        
-                        // OFF Logic
-                        if (/\b(off|stop|kill|disable)\b/.test(cmd)) { 
+                        } 
+                        // Else, check for OFF command
+                        else if (offKeywords.test(cmd)) {
+                            console.log(`Action: ${roomId} OFF`);
                             room.isOn = false; changeMade = true; 
                         }
 
@@ -904,38 +875,98 @@
                             'coral': '#FB7185', 'teal': '#14B8A6', 'sky blue': '#7DD3FC', 'lime': '#84CC16'
                         };
                         for (const [cName, hex] of Object.entries(colorMap)) {
-                            if (cmd.includes(cName)) { room.color = hex; room.isOn = true; changeMade = true; }
+                            if (cmd.includes(cName)) { 
+                                console.log(`Action: ${roomId} Color ${cName}`);
+                                room.color = hex; room.isOn = true; changeMade = true; 
+                            }
                         }
                         
                         // BRIGHTNESS LOGIC
-                        // 1. Exact Number (e.g. "50%")
                         const percentMatch = cmd.match(/(\d{1,3})%/);
                         if (percentMatch) {
                              let val = parseInt(percentMatch[1]);
                              if (val > 100) val = 100; if (val < 0) val = 0;
+                             console.log(`Action: ${roomId} Brightness ${val}%`);
                              room.brightness = val; room.isOn = true; changeMade = true;
                         }
-                        // 2. Keywords
-                        else if (cmd.includes('dim') || cmd.includes('low')) { room.brightness = 30; room.isOn = true; changeMade = true; }
-                        else if (cmd.includes('bright') || cmd.includes('max') || cmd.includes('full')) { room.brightness = 100; room.isOn = true; changeMade = true; }
+                        else if (cmd.includes('dim') || cmd.includes('low')) { 
+                            console.log(`Action: ${roomId} Brightness DIM`);
+                            room.brightness = 30; room.isOn = true; changeMade = true; 
+                        }
+                        else if (cmd.includes('bright') || cmd.includes('max') || cmd.includes('full')) { 
+                            console.log(`Action: ${roomId} Brightness MAX`);
+                            room.brightness = 100; room.isOn = true; changeMade = true; 
+                        }
                     }
                 });
 
-                // Global Dimming (if no specific room mentioned but command implies brightness)
+                // **CRITICAL**: If we made a room-specific change, save and STOP.
+                if (changeMade) {
+                    console.log("Change detected, saving and returning.");
+                    saveLocalData();
+                    return; 
+                }
+
+                // --- 3. GLOBAL ON/OFF (Only if no specific room was matched) ---
+                // This now catches "turn on the lights", "turn off the light", "light on", "lights off" etc.
+                const globalOnRegex = /\b(turn on|power on|activate|lights on|light on)\b/i;
+                const globalOffRegex = /\b(turn off|power off|disable|lights off|light off|shut down|dark mode|good night)\b/i;
+
+                // Check for ON, but make sure it's not an "off" command (e.g., "turn on, not off")
+                if (globalOnRegex.test(cmd) && !globalOffRegex.test(cmd)) {
+                    console.log("Trigger: Global ON");
+                    window.applyGlobalScene('focus'); // 'focus' is the default "all on"
+                    return;
+                }
+                
+                // Check for OFF
+                if (globalOffRegex.test(cmd)) {
+                    console.log("Trigger: Global OFF");
+                    window.applyGlobalScene('off');
+                    return;
+                }
+
+                // --- 4. SCENES & MOODS ---
+                const sceneKeywords = {
+                    'night': ['night', 'sleep', 'bedtime', 'dark', 'goodnight'],
+                    'relax': ['relax', 'chill', 'rest', 'cozy'],
+                    'focus': ['focus', 'study', 'work', 'bright', 'reading'],
+                    'movie': ['movie', 'cinema', 'film', 'theatre'],
+                    'ocean': ['ocean', 'sea', 'water', 'blue mood'],
+                    'forest': ['forest', 'jungle', 'nature', 'green mood'],
+                    'sunset': ['sunset', 'evening', 'dusk', 'orange mood'],
+                    'romance': ['romance', 'love', 'date', 'pink mood']
+                };
+
+                for (const [id, words] of Object.entries(sceneKeywords)) {
+                    if (words.some(w => cmd.includes(w))) {
+                        console.log(`Trigger: Scene ${id}`);
+                        if (['ocean', 'forest', 'sunset', 'romance'].includes(id)) window.triggerEffect(id);
+                        else window.applyGlobalScene(id);
+                        return; // Found a scene, so we're done.
+                    }
+                }
+
+                // --- 5. GLOBAL DIMMING (Last resort) ---
                 if (!mentionedRoom && (cmd.includes('dim') || cmd.includes('brightness') || cmd.includes('low light'))) {
                      const percentMatch = cmd.match(/(\d{1,3})%/);
                      let targetBri = 30; // Default dim
                      if (percentMatch) targetBri = parseInt(percentMatch[1]);
                      
+                     console.log(`Trigger: Global Dim ${targetBri}%`);
                      Object.values(roomsData).forEach(room => {
                          if (room.isOn) { room.brightness = targetBri; changeMade = true; }
                      });
+                     if (changeMade) saveLocalData();
                 }
 
-                if (changeMade) saveLocalData();
+                // If we're here, no command was understood
+                console.log("No matching command found.");
             };
 
             recognition.onend = () => { ring.classList.add('hidden'); btn.classList.remove('bg-blue-600'); };
+            recognition.onerror = (e) => { console.error("Speech recognition error:", e.error); ring.classList.add('hidden'); btn.classList.remove('bg-blue-600'); };
+            
             recognition.start();
         };
 
@@ -945,7 +976,17 @@
                 ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
                 onEnd: (evt) => {
                     triggerHaptic();
-                    // Reorder logic would go here for local state
+                    // Reorder logic
+                    const items = el.children;
+                    const newOrder = {};
+                    for(let i=0; i<items.length; i++) {
+                        const id = items[i].dataset.id;
+                        newOrder[id] = i;
+                    }
+                    Object.values(roomsData).forEach(room => {
+                        room.order = newOrder[room.id];
+                    });
+                    saveLocalData();
                 }
             });
         }
