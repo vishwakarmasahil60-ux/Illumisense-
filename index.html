@@ -431,7 +431,7 @@
         </div>
     </div>
 
-    <script type="module">
+    <script type."module">
         let currentRoomId = null;
         let roomsData = {};
         let partyModeInterval = null;
@@ -797,14 +797,21 @@
 
         // --- (SMARTER VOICE CONTROL) ---
         window.toggleVoiceControl = () => {
-            if (!('webkitSpeechRecognition' in window)) { 
+            // --- NEW: Cross-browser support ---
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) { 
                 // A soft alert for non-compatible browsers
-                alert("Voice control requires a modern browser (Chrome/Edge)."); 
+                alert("Voice control is not supported by your browser (try Chrome, Edge, or Firefox)."); 
                 return; 
             }
+            // --- END NEW ---
+
             const btn = document.getElementById('voice-btn'), ring = document.getElementById('voice-ring');
             triggerHaptic();
-            const recognition = new webkitSpeechRecognition();
+            
+            // --- NEW: Use the cross-browser variable ---
+            const recognition = new SpeechRecognition();
             recognition.lang = 'en-US';
             recognition.onstart = () => { ring.classList.remove('hidden'); btn.classList.add('bg-blue-600'); };
             
@@ -870,7 +877,7 @@
                             'red': '#EF4444', 'blue': '#3B82F6', 'green': '#10B981', 'yellow': '#F59E0B', 
                             'purple': '#A855F7', 'orange': '#F97316', 'pink': '#EC4899', 'cyan': '#06B6D4', 
                             'white': '#FFFFFF', 'warm': '#FFD6AA', 'gold': '#F59E0B', 'magenta': '#DB2777',
-                            'warm white': '#FFD6AA', 'milky white': '#FDF4DC', 'cool white': '#F3F4F6', 'soft white': '#FEF3C7',
+                            'warm white': '#FFD6AA', 'milky white': '#FDF4DC', 'cool white': '#F3F4F4', 'soft white': '#FEF3C7',
                             'light yellow': '#FEF08A', 'warm yellow': '#F59E0B', 'lavender': '#E9D5FF', 'violet': '#8B5CF6',
                             'coral': '#FB7185', 'teal': '#14B8A6', 'sky blue': '#7DD3FC', 'lime': '#84CC16'
                         };
@@ -965,7 +972,16 @@
             };
 
             recognition.onend = () => { ring.classList.add('hidden'); btn.classList.remove('bg-blue-600'); };
-            recognition.onerror = (e) => { console.error("Speech recognition error:", e.error); ring.classList.add('hidden'); btn.classList.remove('bg-blue-600'); };
+            recognition.onerror = (e) => { 
+                console.error("Speech recognition error:", e.error); 
+                // --- NEW: Handle specific permission error ---
+                if (e.error === 'not-allowed') {
+                    alert("Voice control was blocked. Please click the lock icon in your browser's address bar to allow microphone access.");
+                }
+                // --- END NEW ---
+                ring.classList.add('hidden'); 
+                btn.classList.remove('bg-blue-600'); 
+            };
             
             recognition.start();
         };
@@ -1003,5 +1019,6 @@
     </script>
 </body>
 </html>
+
 
 
